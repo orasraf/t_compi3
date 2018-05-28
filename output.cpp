@@ -31,6 +31,12 @@ string output::makeFunctionType(const string& retType, std::vector<string>& argT
 	return res.str();
 }
 
+string output::makeArrayType(const string& elementType, int size)
+{
+	stringstream res;
+	res << elementType << "[" << size << "]";
+	return res.str();
+}
 
 void output::errorLex(int lineno){
     cout << "line " << lineno << ":" << " lexical error" << endl;
@@ -72,6 +78,6 @@ void output::errorByteTooLarge(int lineno, const string& value) {
 	cout << "line " << lineno << ": byte value " << value << " out of range"<< endl;
 } 
 
-void output::errorTooManyDefaults(int lineno) {
-    cout << "line " << lineno << ":" << " too many default cases" << endl;
+void output::errorInvalidArraySize(int lineno, const string& id) {
+    cout << "line " << lineno << ": array " << id << " declared with invalid size" << endl;
 }

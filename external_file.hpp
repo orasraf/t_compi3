@@ -118,6 +118,8 @@ class FormalDecl : public Node{
 public:
 	pair<string,string> nameable;
 	FormalDecl(Node_ptr type_p, Node_ptr id_p, int lineno);
+	//==================== ARRAY ======================
+	FormalDecl(Node_ptr type_p, Node_ptr id_p , Node_ptr arr_size_p , string rule , int lineno);
 };
 class Statements: public Node{
 public:
@@ -142,7 +144,7 @@ public:
 	bool is_return;
 	bool is_emidiate_return ;
 	list<pair<types,int> > return_types;
-	int ln; //currently this only indicates the line of the break, if found.
+	int ln ; //currently this only indicates the line of the break, if found.
 
 
 	Statement(string ter, int lineno);
@@ -155,6 +157,9 @@ public:
 	Statement(string op1, Node_ptr exp_p, Node_ptr caselist_p, string op2, int lineno);
 	Statement(Node_ptr type_p, Node_ptr id_p, Node_ptr exp_p, int lineno);
 	Statement(Node_ptr if_p, Node_ptr sb_p, int lineno, int twice);
+	//============================ ARRAY ==============================================
+	Statement(Node_ptr type_p , Node_ptr id_p , Node_ptr arr_size_p , string rule , int lineno);
+	Statement(Node_ptr id_p , Node_ptr exp1_p , Node_ptr exp2_p , string rule , string dummy , int lineno);
 };
 
 int maxilin(int ln1, int ln2);
@@ -242,6 +247,8 @@ public:
 	Exp(string opa, Node_ptr onlySon, string opb, int lineno);
 
 	Exp(string op, Node_ptr onlySon, int lineno);
+	//======================= ARRAY =======================
+	Exp(Node_ptr id_p, Node_ptr arr_idx_p, string rule , int lineno);
 };
 
 void FuncDeclPartOne(Node_ptr retType_p, Node_ptr id_p, int lineno);

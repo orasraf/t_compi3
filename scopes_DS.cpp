@@ -6,10 +6,12 @@
 #include <vector>
 #include <list>
 #include <stack>
+#include "util.h"
 #include "output.hpp"
 
 
 using namespace std;
+
 
 
 class Name{
@@ -163,6 +165,7 @@ public:
 					type = name->type;
 
 				if(prints){
+
 					output::printID(name->id,name->offSet,type);
 
 				}
@@ -179,7 +182,7 @@ public:
 					}
 					string type ;
 
-						type = name->type;
+						type = type = getNameType(name->type);
 
 					if(prints){
 						output::printID(name->id,name->offSet,type);
@@ -284,8 +287,11 @@ public:
 
 		Name* name_p = new Name(name);
 
-
-		if(name.type != "func"){
+		if(isArray(name_p->type)){
+			name_scope_tuple_stack.push_back(pair<Name*,int>(name_p,scopeDepth));
+			name_p->setOffSet( *(--offsets_stack.end()) );
+			(*(--offsets_stack.end()))+= getArrSize(name_p->type) ;
+		} else if(name.type != "func"){
 			name_scope_tuple_stack.push_back(pair<Name*,int>(name_p,scopeDepth));
 			name_p->setOffSet(*(--offsets_stack.end()));
 			(*(--offsets_stack.end()))++;

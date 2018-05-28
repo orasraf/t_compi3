@@ -9,11 +9,13 @@
 #include "external_file.hpp"
 #include <sstream>
 #include <algorithm>
+#include "util.h"
+
 
 #define YYSTYPE Node*
 
 using namespace std;
-
+extern SymbolsTable st;
 
 void closeFunctionScope(){
 	st.closeFunctionScope();
@@ -453,7 +455,24 @@ Node_ptr Node::getSon(int idx){
 		this->setSon(0,onlySon);
 	}
 
+Exp::Exp(Node_ptr id_p, Node_ptr arr_idx_p, string rule , int lineno):Node(2){
+	this->lineno = lineno;
+	Ter* id = static_cast<Ter*>(id_p);
+	Exp* arr_idx = static_cast<Exp*>(arr_idx_p);
+	if (!st.isNameDefined(id->val)){
+		output::errorDef(lineno,id->val);
+		st.set_prints(false); exit(0);
+	}
+	const Name* arr = st.getName(id->val);
+	this->type = stringToType(getArrType(arr->type));
 
+	if(arr_idx->type != INT_t && arr_idx->type != BYTE_t){
+		output::errorMismatch(lineno);
+		st.set_prints(false); exit(0);
+	}
+	setSon(0,id);
+	setSon(1,arr_idx);
+}
 
 
 
@@ -792,7 +811,59 @@ Statement::Statement(Node_ptr if_p, Node_ptr sb_p, int lineno, int twice):Node(7
 //		this->ln=lineno;
 	}
 
+Statement::Statement(Node_ptr type_p , Node_ptr id_p , Node_ptr arr_size_p , string rule , int lineno):Node(3){
+	is_return=false;
+	is_break=false;
+	is_emidiate_return=false;
+	Exp* arr_size = static_cast<Exp*>(arr_size_p);
+	Ter* id = static_cast<Ter*>(id_p);
+	Type* type = static_cast<Type*>(type_p);
+	if (st.isNameDefined(id->val)){
+				output::errorDef(lineno,id->val);
+				st.set_prints(false); exit(0);
+	}
 
+	if(rule == "Type ID LBRACK NUM B RBRACK SC"){
+		//validate arr_size is not over 255
+		if(atoi( arr_size->value.c_str())>255){
+			output::errorByteTooLarge(lineno,arr_size->value);
+			st.set_prints(false); exit(0);
+		}
+	}
+	if(atoi( arr_size->value.c_str())<=0){
+		output::errorInvalidArraySize(lineno,id->val);
+		st.set_prints(false); exit(0);
+	}
+	st.addNameable(Name(id->val,type->str + "_" + arr_size->value));
+
+	setSon(0,type);
+	setSon(1,id);
+	setSon(2,arr_size);
+}
+Statement::Statement(Node_ptr id_p , Node_ptr arr_idx_p , Node_ptr exp2_p , string rule , string dummy , int lineno):Node(3){
+	is_return=false;
+	is_break=false;
+	is_emidiate_return=false;
+	Ter* id = static_cast<Ter*>(id_p);
+	Exp* arr_idx = static_cast<Exp*>(arr_idx_p);
+	Exp* exp2 = static_cast<Exp*>(exp2_p);
+	if (!st.isNameDefined(id->val)){
+		output::errorUndef(lineno,id->val);
+		st.set_prints(false); exit(0);
+	}
+	const Name* arr = st.getName(id->val);
+	if(arr_idx->type != INT_t && arr_idx->type != BYTE_t){ // THE ARRAY INDEX IS NOT OF NUMERIC TYPE, arr[blabla]
+		output::errorMismatch(lineno);
+		st.set_prints(false); exit(0);
+	}
+	if(exp2->type != stringToType(getArrType(arr->type))){
+		output::errorMismatch(lineno);
+		st.set_prints(false); exit(0);
+	}
+	setSon(0,id);
+	setSon(1,arr_idx);
+	setSon(2,exp2);
+}
 // ============= implementing Statements ========
 Statements::Statements(Node_ptr statement_p, int lineno):Node(1){
 		is_break=false;
@@ -989,7 +1060,34 @@ FormalDecl::FormalDecl(Node_ptr type_p, Node_ptr id_p, int lineno):Node(2){
 		setSon(1,id);
 	}
 
+FormalDecl::FormalDecl(Node_ptr type_p, Node_ptr id_p , Node_ptr arr_size_p , string rule , int lineno):Node(3){
+	Type* type = static_cast<Type*>(type_p);
+	Ter* id = static_cast<Ter*>(id_p);
+	Ter* arr_size = static_cast<Ter*>(arr_size_p);
+	if (st.isNameDefined(id->val)) {
+		output::errorDef(lineno, id->val);
+		st.set_prints(false);
+		exit(0);
+	}
+	if (rule == "Type ID LBRACK NUM B RBRACK") {
+		//validate arr_size is not over 255
+		if (atoi(arr_size->val.c_str()) > 255) {
+			output::errorByteTooLarge(lineno, arr_size->val);
+			st.set_prints(false);
+			exit(0);
+		}
+	}
+	if(atoi( arr_size->val.c_str())<=0){
+		output::errorInvalidArraySize(lineno,id->val);
+		st.set_prints(false); exit(0);
+	}
 
+	st.addNameable(Name(id->val,type->str + "_" + arr_size->val));
+
+	setSon(0,id);
+	setSon(1,type);
+	setSon(2,arr_size);
+}
 
 
 //========== implementing CaseList
@@ -1014,86 +1112,10 @@ CaseList::CaseList(Node_ptr casestatement_p, int lineno):Node(1){
 		////--//--cout << "single caselist is: " << ln << endl;
 		setSon(0,casestatement);
 	}
-CaseList::CaseList(Node_ptr caselist_p, Node_ptr casestatement_p, int lineno):Node(2){
-		default_count=0;
-		CaseList* caselist = static_cast<CaseList*>(caselist_p);
-		CaseStatement* casestatement = static_cast<CaseStatement*>(casestatement_p);
-		this->default_count = casestatement->default_count + caselist->default_count;
-		if (this->default_count>1){
-			////--//--cout << "casestatement is: " << casestatement->ln1 << endl;
-			////--//--cout << "caselist is: " << caselist->ln << endl;
-			int temp = maxilin(casestatement->ln1,caselist->ln);
-			output::errorTooManyDefaults(temp);
-			st.set_prints(false); exit(0);
-		} else {
-			if (casestatement->ln1>0){
-				this->ln = casestatement->ln1;
-			} else if (caselist->ln>0){
-				this->ln = caselist->ln;
-			}
-		}
-		setSon(0,caselist);
-		setSon(1,casestatement);
-	}
+
 //
 
 
-//==========implementing caseStatements
-CaseStatement::CaseStatement(Node_ptr casedec_p, int lineno):Node(1){
-		default_count=0;
-		this->ln1=-1;
-		CaseDec* casedec = static_cast<CaseDec*>(casedec_p);
-		if(casedec->default_count!=0){
-			this->default_count++;
-			this->ln1=casedec->ln;
-		}
-		setSon(0,casedec);
-	}
-CaseStatement::CaseStatement(Node_ptr casedec_p, Node_ptr statements_p, int lineno):Node(2){
-		default_count=0;
-		this->ln1=-1;
-		CaseDec* casedec = static_cast<CaseDec*>(casedec_p);
-		Statements* statements = static_cast<Statements*>(statements_p);
-		if(casedec->default_count!=0){
-			this->default_count++;
-			this->ln1=casedec->ln;
-		}
-		setSon(0,casedec);
-		setSon(1,statements);
-	}
-
-//===========IMPLEMENTING CaseDec
-CaseDec::CaseDec(int lineno):Node(2){
-		default_count=0;
-		Ter* deft = new Ter("default","DEFAULT");
-		Ter* colon = new Ter("colon", "COLON");
-		this->default_count = 1;
-		this->ln = lineno;
-		setSon(0,deft);
-		setSon(1,colon);
-	}
-CaseDec::CaseDec(Node_ptr num_p, int lineno):Node(3){
-		default_count=0;
-		this->ln=-1;
-		Ter* num = static_cast<Ter*>(num_p);
-		Ter* cse = new Ter("case","CASE");
-		Ter* colon = new Ter("colon","COLON");
-		setSon(0,cse);
-		setSon(1,num);
-		setSon(2,colon);
-	}
-CaseDec::CaseDec(string a, Node_ptr num_p, int lineno):Node(4){
-		default_count=0;
-		this->ln=-1;
-		Ter* num = static_cast<Ter*>(num_p);
-		Ter* cse = new Ter("case","CASE");
-		Ter* colon = new Ter("colon","COLON");
-		Ter* b = new Ter(a,a);
-		setSon(0,cse);
-		setSon(1,num);
-		setSon(2,b);
-		setSon(3,colon);
-	}
 
 
 void FuncDeclPartOne(Node_ptr retType_p, Node_ptr id_p, int lineno){

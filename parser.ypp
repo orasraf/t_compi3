@@ -34,6 +34,8 @@ extern int yylineno;
 
 %token			LBRACE
 %token			RBRACE
+%token			LBRACK
+%token			RBRACK
 
 %token 			ID
 %token			NUM
@@ -87,8 +89,10 @@ FormalsList:	FormalDecl {$$=new FormalsList($1,yylineno);}
 |						FormalDecl COMMA FormalsList {$$=new FormalsList($1,$3,yylineno);}
 ;
 FormalDecl:	Type ID {$$=new FormalDecl($1,$2,yylineno);}
-| 			Type ID LBRACK NUM RBRACK {}
-|			Type ID LBRACK NUM B RBRACK {}
+//================================== ARRAY ===============================================
+| 			Type ID LBRACK NUM RBRACK {$$=new FormalDecl($1,$2,$4,"Type ID LBRACK NUM RBRACK",yylineno);}
+|			Type ID LBRACK NUM B RBRACK {$$=new FormalDecl($1,$2,$4,"Type ID LBRACK NUM B RBRACK",yylineno);}
+//================================== ARRAY END ===========================================
 ;
 
 StatementIF:	IF LPAREN Exp RPAREN {CheckBoolExpression($3,yylineno);}
@@ -101,12 +105,12 @@ Statement:		LBRACE OpenScope Statements CloseScope RBRACE {$$=new Statement("STA
 |						Type ID SC {$$=new Statement($1,$2,yylineno);}
 |						Type ID ASSIGN Exp SC {$$=new Statement($1,$2,$4,yylineno);}
 //================================== ARRAY ===============================================
-| 						Type ID LBRACK NUM RBRACK SC {}
-|						Type ID LBRACK NUM B RBRACK SC {}
+| 						Type ID LBRACK NUM RBRACK SC {$$=new Statement($1,$2,$4,"Type ID LBRACK NUM RBRACK SC",yylineno);}
+|						Type ID LBRACK NUM B RBRACK SC {$$=new Statement($1,$2,$4,"Type ID LBRACK NUM B RBRACK SC",yylineno);}
 //================================== ARRAY END ===========================================
 |						ID ASSIGN Exp SC {$$=new Statement("ASSIGN",$1,$3,yylineno);}
 //================================== ARRAY assign ========================================
-|						ID LBRACK Exp RBRACK ASSIGN Exp SC {}
+|						ID LBRACK Exp RBRACK ASSIGN Exp SC {$$=new Statement($1,$3,$6,"ID LBRACK Exp RBRACK ASSIGN Exp SC","dummy",yylineno);}
 //================================== ARRAY assign end=====================================
 |						Call SC {$$=new Statement($1,yylineno);}
 |						RETURN SC {$$=new Statement("RETURN",yylineno);}
@@ -139,7 +143,7 @@ Type:				INT {$$=new Type("INT",yylineno);}
 ;
 Exp:				LPAREN Exp RPAREN {$$=new Exp("(",$2,")",yylineno);}
 //================================== ARRAY Exp ===============================================
-|					ID LBRACK Exp RBRACK {}
+|					ID LBRACK Exp RBRACK {$$=new Exp($1,$3,"ID LBRACK Exp RBRACK",yylineno);}
 //================================== ARRAY Exp end ===========================================
 |						Exp BINOPADD Exp {$$=new Exp("+",$1,$3,yylineno);}
 |						Exp BINOPSUB Exp {$$=new Exp("-",$1,$3,yylineno);}

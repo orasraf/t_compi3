@@ -18,6 +18,7 @@
 using namespace std;
 
 extern SymbolsTable st;
+extern int program_main;
 
 class Node;
 typedef Node* Node_ptr;
@@ -37,6 +38,7 @@ public:
 	int getNumberOfSons();
 	void setSon(int idx, Node_ptr son_p);
 	Node_ptr getSon(int idx);
+	string name;
 };
 
 class Op : public Node{
@@ -83,7 +85,7 @@ public:
 class Funcs : public Node{
 public:
 	bool is_main;
-
+	string f_list;
 
 	Funcs(Node_ptr funcdecl_p, Node_ptr funcs_p, int lineno);
 	Funcs(int lineno);
@@ -92,7 +94,7 @@ public:
 class FuncDecl : public Node{
 public:
 	bool is_main;
-
+	string f_name;
 	FuncDecl(Node_ptr rettype_p, Node_ptr id_p, Node_ptr formals_p, Node_ptr statements_p, int lineno);
 };
 
@@ -222,7 +224,9 @@ public:
 class Exp : public Node{
 public:
 	types type;
+	string arr_type;
 	string value;
+	bool is_array;
 	int lineno;
 private:
 // ========================

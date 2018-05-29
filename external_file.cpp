@@ -16,6 +16,7 @@
 
 using namespace std;
 extern SymbolsTable st;
+extern int program_main;
 
 void closeFunctionScope(){
 	st.closeFunctionScope();
@@ -129,6 +130,7 @@ Node_ptr Node::getSon(int idx){
 						for(int i=0; i < myName->numerOfParams ; i++){
 							paramList.push_back(myName->parameters[i].first);
 						}
+						//cout << "here 2 " << endl;
 						output::errorPrototypeMismatch(lineno,id->val,paramList);
 						st.set_prints(false); exit(0);
 					}
@@ -172,6 +174,7 @@ Node_ptr Node::getSon(int idx){
 					paramList.push_back(myName->parameters[i].first);
 //					////--//--cout << "needed param number " << i << " is " << myName->parameters[i].first << endl;
 //					////--//--cout << "received param number " << i << " is " << (*expIt) << endl;
+					//cout << "myName->parameters[i].first!=(*expIt) || " << myName->parameters[i].first<<" =?= "<<(*expIt) << endl;
 					if (myName->parameters[i].first!=(*expIt)){
 						if (!(myName->parameters[i].first=="INT" && (*expIt)=="BYTE")){
 							errType=true;
@@ -182,6 +185,7 @@ Node_ptr Node::getSon(int idx){
 					}
 				}
 				if (errType){
+					//cout << "here" << endl;
 					output::errorPrototypeMismatch(lineno,id->val,paramList);
 					st.set_prints(false); exit(0);
 				}
@@ -388,7 +392,7 @@ Node_ptr Node::getSon(int idx){
 		this->setSon(2,right);
 	}
 
-	Exp::Exp(Node_ptr onlySon, int lineno):Node(2),type(UNDEF_t),value(""),lineno(lineno){
+	Exp::Exp(Node_ptr onlySon, int lineno):Node(2),type(UNDEF_t),value(""),lineno(lineno),is_array(false){
 		Exp* son = static_cast<Exp*>(onlySon);
 
 		if (son->type!=BOOL_t){
@@ -408,7 +412,7 @@ Node_ptr Node::getSon(int idx){
 		this->setSon(1,son);
 	}
 
-	Exp::Exp(string opa, Node_ptr onlySon, string opb, int lineno):Node(3),type(UNDEF_t),value(""),lineno(lineno){
+	Exp::Exp(string opa, Node_ptr onlySon, string opb, int lineno):Node(3),type(UNDEF_t),value(""),lineno(lineno),is_array(false){
 		Exp* son = static_cast<Exp*>(onlySon);
 
 		this->type=son->type;
@@ -446,6 +450,10 @@ Node_ptr Node::getSon(int idx){
 				} else {
 					Name* temp =st.getNoneConstName(son->val);
 					this->type = stringToType(temp->type);
+					if(isArray(temp->type)){
+						arr_type = temp->type;
+						is_array = true;
+					}
 				}
 			} else if (op=="STRING"){
 				this->type=STRING_t;
@@ -453,9 +461,10 @@ Node_ptr Node::getSon(int idx){
 			this->value=son->getVal();
 		}
 		this->setSon(0,onlySon);
+
 	}
 
-Exp::Exp(Node_ptr id_p, Node_ptr arr_idx_p, string rule , int lineno):Node(2){
+Exp::Exp(Node_ptr id_p, Node_ptr arr_idx_p, string rule , int lineno):Node(2),is_array(false){
 	this->lineno = lineno;
 	Ter* id = static_cast<Ter*>(id_p);
 	Exp* arr_idx = static_cast<Exp*>(arr_idx_p);
@@ -481,8 +490,12 @@ ExpList::ExpList(Node_ptr exp_p, int lineno):Node(1){
 		Exp* exp = static_cast<Exp*>(exp_p);
 		this->size=1;
 		this->type=exp->type;
-		string temp = typeToString(exp->type);
-		myList.insert(myList.begin(),temp);
+		string actual_type = typeToString(exp->type);
+		if(exp->is_array){
+			actual_type = exp->arr_type;
+		}
+
+		myList.insert(myList.begin(),actual_type);
 		setSon(0,exp);
 	}
 ExpList::ExpList(Node_ptr exp_p, Node_ptr explist_p, int lineno):Node(3){
@@ -490,9 +503,13 @@ ExpList::ExpList(Node_ptr exp_p, Node_ptr explist_p, int lineno):Node(3){
 		ExpList* explist = static_cast<ExpList*>(explist_p);
 		this->size=explist->size+1;
 		this->type=UNDEF_t;
-		string temp = typeToString(exp->type);
+		//string temp = typeToString(exp->type);
 		myList = explist->myList;
-		myList.insert(myList.begin(),temp);
+		string actual_type = typeToString(exp->type);
+		if(exp->is_array){
+			actual_type = exp->arr_type;
+		}
+		myList.insert(myList.begin(),actual_type);
 		Ter* comma = new Ter(",","COMMA");
 		setSon(0,exp);
 		setSon(1,comma);
@@ -600,8 +617,26 @@ Statement::Statement(string op, Node_ptr id_p, Node_ptr exp_p, int lineno):Node(
 		Ter* ass = new Ter("=",op);
 		Exp* exp = static_cast<Exp*>(exp_p);
 		if (st.isNameDefined(id->val)){
-			const Name* temp = st.getName(id->val);
+			const Name* temp = st.getName(id->val); //temp = LHS , exp = RHS : temp = exp ;
 			types tempType = stringToType(temp->type);
+			if(isArray(temp->type)){
+//				cout << "DEBUG: before is_array(exp)" << endl;
+				if(exp->is_array){
+//					cout << "DEBUG: exp IS array" << endl;
+//					cout << "DEBUG exp->arr_type: "+ exp->arr_type <<endl;
+//					cout << "DEBUG temp->arr_type: "+ temp->type <<endl;
+					if(exp->arr_type != temp->type){
+//						cout << "exp->arr_type != temp->type : true"<< endl;
+
+						output::errorMismatch(lineno);
+						st.set_prints(false); exit(0);
+					}
+				} else {
+					output::errorMismatch(lineno);
+					st.set_prints(false); exit(0);
+				}
+
+			}
 			if(temp->type == "func"){
 				output::errorUndef(lineno , id->val);
 				st.set_prints(false); exit(0);
@@ -815,7 +850,7 @@ Statement::Statement(Node_ptr type_p , Node_ptr id_p , Node_ptr arr_size_p , str
 	is_return=false;
 	is_break=false;
 	is_emidiate_return=false;
-	Exp* arr_size = static_cast<Exp*>(arr_size_p);
+	Ter* arr_size = static_cast<Ter*>(arr_size_p);
 	Ter* id = static_cast<Ter*>(id_p);
 	Type* type = static_cast<Type*>(type_p);
 	if (st.isNameDefined(id->val)){
@@ -825,16 +860,20 @@ Statement::Statement(Node_ptr type_p , Node_ptr id_p , Node_ptr arr_size_p , str
 
 	if(rule == "Type ID LBRACK NUM B RBRACK SC"){
 		//validate arr_size is not over 255
-		if(atoi( arr_size->value.c_str())>255){
-			output::errorByteTooLarge(lineno,arr_size->value);
+		if(atoi( arr_size->val.c_str())>255){
+			output::errorByteTooLarge(lineno,arr_size->val);
 			st.set_prints(false); exit(0);
 		}
 	}
-	if(atoi( arr_size->value.c_str())<=0){
+	if(atoi( arr_size->val.c_str())>255){
 		output::errorInvalidArraySize(lineno,id->val);
 		st.set_prints(false); exit(0);
 	}
-	st.addNameable(Name(id->val,type->str + "_" + arr_size->value));
+	if(atoi( arr_size->val.c_str())<=0){
+		output::errorInvalidArraySize(lineno,id->val);
+		st.set_prints(false); exit(0);
+	}
+	st.addNameable(Name(id->val,type->str + "_" + arr_size->val));
 
 	setSon(0,type);
 	setSon(1,id);
@@ -856,7 +895,9 @@ Statement::Statement(Node_ptr id_p , Node_ptr arr_idx_p , Node_ptr exp2_p , stri
 		output::errorMismatch(lineno);
 		st.set_prints(false); exit(0);
 	}
-	if(exp2->type != stringToType(getArrType(arr->type))){
+	if (!(exp2->type == stringToType(getArrType(arr->type))
+			|| (exp2->type == BYTE_t
+					&& stringToType(getArrType(arr->type)) == INT_t))) {
 		output::errorMismatch(lineno);
 		st.set_prints(false); exit(0);
 	}
@@ -946,7 +987,12 @@ FuncDecl::FuncDecl(Node_ptr rettype_p, Node_ptr id_p, Node_ptr formals_p, Node_p
 		//--//--////--//--cout << "]]>>> void main check: " << id->val << " , " << rettype->is_void << " " << formals->is_empty << endl;
 		if (id->val=="main" && rettype->is_void && formals->is_empty){ // can i assume that main is written in lower case letters?
 			this->is_main=true;
+		//	cout << "DEBUG : [FUNCDECL] is main: true" << endl;
+		} else {
+		//	cout << "DEBUG : [FUNCDECL] is main: false" << endl;
 		}
+		f_name = id->val;
+		//cout << "DEBUG : [FUNCDECL]" + f_name << endl;
 //		Name* funcName= st.getNoneConstName(id->val);
 //		funcName->update(formals->decl);
 //		st.setFuncParams(formals->decl);
@@ -972,7 +1018,15 @@ Funcs::Funcs(Node_ptr funcdecl_p, Node_ptr funcs_p, int lineno):Node(2){
 		Funcs* funcs = static_cast<Funcs*>(funcs_p);
 		if (funcdecl->is_main || funcs->is_main){
 			this->is_main=true;
+		//	cout << "DEBUG : [FUNCS] is main: true" << endl;
+		} else {
+			//cout << "DEBUG : [FUNCS] is main: false" << endl;
 		}
+		f_list = "" +
+				funcs->f_list +
+				", " + funcdecl->f_name;
+		//cout << "DEBUG: [FUNCS] " + f_list << endl;
+		//cout << "DEBUG [FUNCS]  " + funcdecl->f_name << endl;
 		setSon(0,funcdecl);
 		setSon(1,funcs);
 	}
@@ -984,9 +1038,12 @@ Funcs::Funcs(int lineno):Node(){
 //==============implement Program
 Program::Program(Node_ptr funcs_p, int lineno):Node(1){
 		Funcs* funcs = static_cast<Funcs*>(funcs_p);
-		if (!(funcs->is_main)){
-			output::errorMainMissing();
-			st.set_prints(false); exit(0);
+//		if (!(funcs->is_main)){
+//			output::errorMainMissing();
+//			st.set_prints(false); exit(0);
+//		}
+		if (funcs->is_main){
+			program_main = 1;
 		}
 		setSon(0,funcs);
 	}
@@ -1012,6 +1069,7 @@ RetType::RetType(int lineno):Node(1){
 //====== implementing Formals
 Formals::Formals(Node_ptr formalslist_p, int lineno):Node(1){
 		//////--//--cout << "in formals" << endl;
+		name = "Formals instance";
 		is_empty = false;
 		FormalsList* formalslist = static_cast<FormalsList*>(formalslist_p);
 		this->decl = formalslist->decl;
@@ -1021,6 +1079,7 @@ Formals::Formals(int lineno):Node(){
 		//////--//--cout << "in empty formals" << endl;
 		//TODO: figure out if this is the way to handle epsilons, and if so, change the parser to match
 		is_empty=true;
+		name = "Formals instance";
 	}
 
 
@@ -1077,12 +1136,18 @@ FormalDecl::FormalDecl(Node_ptr type_p, Node_ptr id_p , Node_ptr arr_size_p , st
 			exit(0);
 		}
 	}
-	if(atoi( arr_size->val.c_str())<=0){
-		output::errorInvalidArraySize(lineno,id->val);
-		st.set_prints(false); exit(0);
+	if (atoi(arr_size->val.c_str()) > 255) {
+		output::errorInvalidArraySize(lineno, id->val);
+		st.set_prints(false);
+		exit(0);
 	}
-
-	st.addNameable(Name(id->val,type->str + "_" + arr_size->val));
+	if (atoi(arr_size->val.c_str()) <= 0) {
+		output::errorInvalidArraySize(lineno, id->val);
+		st.set_prints(false);
+		exit(0);
+	}
+	this->nameable = pair<string,string>(type->str + "_" + arr_size->val,id->val);
+	//st.addNameable(Name(id->val,type->str + "_" + arr_size->val));
 
 	setSon(0,id);
 	setSon(1,type);
@@ -1138,12 +1203,13 @@ void FuncDeclPartTwo(Node_ptr id_p, Node_ptr formals_p, int lineno){
 		//--//--////--//--cout <<"FFFFFFUUUCK"<<endl;
 		st.set_prints(false); exit(0);
 	}
+
 	st.enterFunctionScope(formals->decl.size());
 	//TODO: remove the prints
 	////--//--////--//--cout << formals->decl.size() << endl;
 	funcName->update(
 			formals->decl);
-	st.setFuncParams(formals->decl);
+	st.setFuncParams(formals->decl,lineno);
 	//////--//--cout << "in func decl part 2" << endl;
 }
 

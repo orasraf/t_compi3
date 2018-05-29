@@ -1,6 +1,7 @@
 #include <iostream>
 #include "output.hpp"
 #include <sstream>
+#include "util.h"
 
 using namespace std;
 
@@ -15,8 +16,14 @@ void output::printID(const string& id, int offset, const string& type  ){
 string typeListToString(const std::vector<string>& argTypes) {
 	stringstream res;
 	res << "(";
+	string actual_type;
 	for(int i = 0; i < argTypes.size(); ++i) {
-		res << argTypes[i];
+		if(isArray(argTypes[i])){
+			actual_type = output::makeArrayType(getArrType(argTypes[i]),getArrSize(argTypes[i]));
+		} else {
+			actual_type = argTypes[i];
+		}
+		res << actual_type;
 		if (i + 1 < argTypes.size())
 			res << ",";
 	}

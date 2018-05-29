@@ -69,15 +69,22 @@ extern int yylineno;
 
 %%
 
-Program:		Funcs {$$=new Program($1,yylineno);}
+Program:		 Funcs {$$=new Program($1,yylineno);}
 ;
-Funcs : 		FuncDecl Funcs {$$=new Funcs($1,$2,yylineno);}
-|				/* epsilon*/ {$$=new Funcs(yylineno);}		
+Funcs : 		FuncDecl Funcs {	//cout<< "parser:"<<((Funcs*) $2)->f_list << endl;
+									//cout<< "parser:"<<((FuncDecl*) $1)->f_name << endl;
+									$$=new Funcs($1,$2,yylineno);
+								 
+								 //cout<< "parser:"<<((Funcs*) $2)->f_list << endl;
+								 }
+|				/* epsilon*/ {$$=new Funcs(yylineno);
+							//cout<< "parser: epsilon"<<endl;
+							}		
 ;
 FuncDecl :  	RetType ID {FuncDeclPartOne($1,$2,yylineno);}
 				LPAREN OpenScopeF Formals RPAREN {FuncDeclPartTwo($2,$6,yylineno);}
-				LBRACE Statements {$0=new FuncDecl($1,$2,$6,$10,yylineno);} //TODO: check return type
-				CloseScopeF RBRACE {$$=$0;}
+				LBRACE Statements {$$=new FuncDecl($1,$2,$6,$10,yylineno);} //TODO: check return type
+				RBRACE CloseScopeF {$$=$11;}
 ;
 RetType : 		Type {$$=new RetType($1,yylineno);}
 | 						VOID {$$=new RetType(yylineno);}
@@ -186,8 +193,10 @@ st.set_prints(false);
 } 
 
 SymbolsTable st;
+int program_main;
 
 int main(){
+	program_main = 0;
 	pair<string,string> params[1] ;
 	params[0] = pair<string,string> ("STRING","x");
 	st.addNameable(Name("print","func","VOID",1,params));
@@ -196,6 +205,16 @@ int main(){
 	st.addNameable(Name("printi","func","VOID",1,another));
 	
 	int ret_val =  yyparse();
+	if(ret_val != 0 ){
+		output::errorSyn(yylineno);
+		st.set_prints(false); exit(0);
+	} else {
+		if(program_main == 0){
+			output::errorMainMissing();
+			st.set_prints(false); exit(0);
+		}
+	}
+	
 	st.set_prints(true);
 	return ret_val;
 } 
